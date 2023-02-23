@@ -4,10 +4,8 @@ author: "Simon Oiry"
 format: 
   docx:
     reference-doc: Word_Template.docx
-editor: visual
 fig-dpi: 300
 ---
-
 
 ```{r library}
 library(raster)
@@ -15,4 +13,3 @@ library(sf)
 library(terra)
 library(tidyverse)
 ```
-
