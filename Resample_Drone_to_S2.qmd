@@ -17,8 +17,6 @@ library(stars)
 library(DescTools)
 
 ```
-<<<<<<< HEAD
-
 
 ```{r df_building}
 S2_imglist<-"Data/S2" %>% 
@@ -212,8 +210,3 @@ for (i in 1:nrow(df_Pred)) {
 
 
 ```
-
-
-
-=======
->>>>>>> 12ad26fae3f172289a86d9f6275b79dc988f49a4
