@@ -14,5 +14,205 @@ library(raster)
 library(sf)
 library(terra)
 library(tidyverse)
+library(sp)
+library(stars)
+library(DescTools)
+
 ```
+
+
+```{r df_building}
+S2_imglist<-"Data/S2" %>% 
+  list.files(".SAFE", include.dirs = T, recursive = T, full.names = T)
+
+sites_img<-S2_imglist %>% 
+  gsub("Data/S2/","",.) %>% 
+  gsub("img/","",.) %>% 
+  gsub("/.*","",.)
+
+S2_df<-data.frame(path_img = S2_imglist,
+                  site = sites_img)
+
+shp_list<-"Data/S2" %>% 
+  list.files(".shp", recursive = T, full.names = T) 
+
+sites_shp<-shp_list %>% 
+  gsub("Data/S2/","",.) %>% 
+  gsub("/.*","",.)
+
+shp_df<-data.frame(path_mask = shp_list,
+                  site = sites_shp)
+
+df_S2<-S2_df %>% 
+  left_join(shp_df, by = "site")
+
+Pred_imglist<-"Data/Prediction" %>% 
+  list.files(".tif", include.dirs = T, recursive = T, full.names = T)
+
+sites_Pred<-Pred_imglist %>% 
+  gsub("Data/Prediction/","",.) %>% 
+  gsub("/.*","",.)
+
+df_Pred<-data.frame(path_img = Pred_imglist,
+                  site = sites_Pred)
+
+
+Drone_img<-"Data/Drone" %>% 
+  list.files(".tif", recursive = T, full.names = T)
+
+sites_drone<-Drone_img %>% 
+  gsub("Data/Drone/","",.) %>% 
+  gsub("/.*","",.)
+df_Drone<-data.frame(path_drone = Drone_img,
+                     site = sites_drone)
+
+
+rm(S2_imglist,S2_df,shp_df,shp_list,sites_img,sites_shp,Drone_img,sites_drone, Pred_imglist,sites_Pred)
+
+```
+
+```{r Drone orthomosaic resampling}
+
+for (i in 1:nrow(df_Drone)) {
+  drone_img<-stack(df_Drone$path_drone[i])
+  
+  ext<-extent(drone_img)
+  ext<-as(ext, "SpatialPolygons")
+  crs(ext)<-crs(drone_img)
+  
+  
+  S2_df_sample<-df_S2[which(df_S2$site == df_Drone$site[i]),]
+  TCI10<-list.files(S2_df_sample$path_img, pattern = "TCI_10m.jp2",recursive = T,full.names = T) %>% 
+    raster() 
+  TCI20<-list.files(S2_df_sample$path_img, pattern = "TCI_20m.jp2",recursive = T,full.names = T) %>% 
+    raster()
+  # TCI60<-list.files(S2_df_sample$path_img, pattern = "TCI_60m.jp2",recursive = T,full.names = T) %>% 
+  #   stack()
+  ext<-spTransform(ext,crs(TCI10))
+  
+  TCI10<-TCI10 %>% 
+    crop(ext)
+  
+  TCI20<-TCI20 %>% 
+    crop(ext)
+
+
+
+drone10m<-projectRaster(from = drone_img, to = TCI10, res = res(TCI10), crs = crs(TCI10), method="bilinear")
+  drone20m<-projectRaster(from = drone_img, to = TCI20, res = res(TCI20), crs = crs(TCI20), method="bilinear")
+  
+  names(drone10m)<-c(paste0("B",c(1:10)))
+  names(drone20m)<-c(paste0("B",c(1:10)))
+  
+  drone10m<-drone10m %>% 
+    as.data.frame(xy=T) %>% 
+    dplyr::filter(!is.na(B1)) %>% 
+    st_as_stars(coords = c("x", "y")) %>% 
+    as("Raster")
+  
+crs(drone10m)<-crs(TCI10)
+
+  drone20m<-drone20m %>% 
+    as.data.frame(xy=T) %>% 
+    dplyr::filter(!is.na(B1)) %>% 
+    st_as_stars(coords = c("x", "y")) %>% 
+    as("Raster")
+  
+crs(drone20m)<-crs(TCI20)
+
+  names10m<-gsub(".*/","",df_Drone$path_drone[i]) %>% 
+    gsub(".tif","_10m.tif",.)
+ writeRaster(drone10m,paste0("Output/Drone/",names10m),overwrite = T)
+   names20m<-gsub(".*/","",df_Drone$path_drone[i]) %>% 
+    gsub(".tif","_20m.tif",.)
+ writeRaster(drone20m,paste0("Output/Drone/",names20m),overwrite = T)
+}
+
+```
+
+```{r Drone prediction resampling}
+for (i in 1:nrow(df_Pred)) {
+  
+  Pred_img<-raster(df_Pred$path_img[i])
+  
+  ext<-extent(Pred_img)
+  ext<-as(ext, "SpatialPolygons")
+  crs(ext)<-crs(Pred_img)
+  
+  
+  S2_df_sample<-df_S2[which(df_S2$site == df_Pred$site[i]),]
+  TCI10<-list.files(S2_df_sample$path_img, pattern = "TCI_10m.jp2",recursive = T,full.names = T) %>% 
+    raster() 
+  TCI20<-list.files(S2_df_sample$path_img, pattern = "TCI_20m.jp2",recursive = T,full.names = T) %>% 
+    raster()
+  # TCI60<-list.files(S2_df_sample$path_img, pattern = "TCI_60m.jp2",recursive = T,full.names = T)
+  ext<-spTransform(ext,crs(TCI10))
+  
+  TCI10<-TCI10 %>% 
+    crop(ext)
+  
+  TCI20<-TCI20 %>% 
+    crop(ext)
+  
+  # Pred10m<-projectRaster(from = Pred_img, to = TCI10, res = res(TCI10), crs = crs(TCI10), method="bilinear")
+  # Pred20m<-projectRaster(from = Pred_img, to = TCI20, res = res(TCI20), crs = crs(TCI20), method="bilinear")
+  
+  
+  values(TCI10)<-c(1:(nrow(TCI10)*ncol(TCI10)))
+    TCI10wgs84_10m<-projectRaster(TCI10, crs = crs(Pred_img), method = "ngb")
+    TCI10wgs84_10m_drone<-resample(TCI10wgs84_10m, Pred_img, method = "ngb")
+    TCI10wgs84_10m_drone<-crop(TCI10wgs84_10m_drone,extent(Pred_img))
+    stk_10<-stack(Pred_img, TCI10wgs84_10m_drone) %>% 
+      as.data.frame(xy=F)
+    names(stk_10)<-c("Pred","S2")
+    mod_stk_10<-stk_10 %>% 
+      group_by(S2) %>% 
+      summarise(mod = Mode(Pred))
+    S2_matrix_10<-TCI10wgs84_10m %>% 
+      as.data.frame(xy=T) %>% 
+      filter(!is.na(layer)) %>% 
+      rename(S2_ID = "layer") %>% 
+      left_join(mod_stk_10, by = c("S2_ID" = "S2")) %>% 
+      select(-c(S2_ID)) %>% 
+      st_as_sf(coords = c("x", "y"))
+    rf_raster_out_S2_10<-st_rasterize(S2_matrix_10)
+    st_crs(rf_raster_out_S2_10)<-st_crs(Pred_img)
+    names10m<-gsub(".*/","",df_Pred$path_img[i]) %>% 
+      gsub(".tif","_10m.tif",.)
+    write_stars(rf_raster_out_S2_10,paste0("Output/Prediction/",names10m),overwrite = T)
+    
+  values(TCI20)<-c(1:(nrow(TCI20)*ncol(TCI20)))
+    TCI20wgs84_20m<-projectRaster(TCI20, crs = crs(Pred_img), method = "ngb")
+    TCI20wgs84_20m_drone<-resample(TCI20wgs84_20m, Pred_img, method = "ngb")
+    TCI20wgs84_20m_drone<-crop(TCI20wgs84_20m_drone,extent(Pred_img))
+    stk_20<-stack(Pred_img, TCI20wgs84_20m_drone) %>% 
+      as.data.frame(xy=F)
+    names(stk_20)<-c("Pred","S2")
+    mod_stk_20<-stk_20 %>% 
+      group_by(S2) %>% 
+      summarise(mod = Mode(Pred))
+    S2_matrix_20<-TCI20wgs84_20m %>% 
+      as.data.frame(xy=T) %>% 
+      filter(!is.na(layer)) %>% 
+      rename(S2_ID = "layer") %>% 
+      left_join(mod_stk_20, by = c("S2_ID" = "S2")) %>% 
+      select(-c(S2_ID)) %>% 
+      st_as_sf(coords = c("x", "y"))
+    rf_raster_out_S2_20<-st_rasterize(S2_matrix_20)
+    st_crs(rf_raster_out_S2_20)<-st_crs(Pred_img)
+    names20m<-gsub(".*/","",df_Pred$path_img[i]) %>% 
+      gsub(".tif","_20m.tif",.)
+    write_stars(rf_raster_out_S2_20,paste0("Output/Prediction/",names20m),overwrite = T)
+    
+    
+
+    
+
+    
+}
+
+
+```
+
+
 
