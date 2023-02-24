@@ -4,10 +4,8 @@ author: "Simon Oiry"
 format: 
   docx:
     reference-doc: Word_Template.docx
-editor: visual
 fig-dpi: 300
 ---
-
 
 ```{r library}
 library(raster)
@@ -19,6 +17,7 @@ library(stars)
 library(DescTools)
 
 ```
+<<<<<<< HEAD
 
 
 ```{r df_building}
@@ -216,3 +215,5 @@ for (i in 1:nrow(df_Pred)) {
 
 
 
+=======
+>>>>>>> 12ad26fae3f172289a86d9f6275b79dc988f49a4
